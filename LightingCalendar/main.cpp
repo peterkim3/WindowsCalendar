@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -7,20 +8,20 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "shader_m.h"
+#include "shader.h"
 #include "utils.h"
 
 #include <iostream>
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window);
-
+void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+void processInput(GLFWwindow *window);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 300;
+const unsigned int SCR_HEIGHT = 280;
 
 // camera
+glm::vec3 viewPos = glm::vec3(0.0f, 0.0f, 0.5f);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -29,35 +30,9 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-const char *vertexShaderSource =
-    "#version 330 core\n"
-    "layout(location = 0) in vec3 aPos;\n"
-    "layout(location = 1) in vec3 aNormal;\n"
-    "layout(location = 2) in vec2 aTexCoords;\n"
-    "out vec3 Normal;\n"
-    "out vec2 TexCoords;\n"
-    "\n"
-    "void main() {\n"
-    "   Normal = aNormal;\n"
-    "   TexCoords = vec2(aTexCoords.x, aTexCoords.y);\n"
-    "\n"
-    "   gl_Position = vec4(aPos, 1.0);\n"
-    "}\n\0";
 
-const char *fragmentShaderSource =
-    "#version 330 core\n"
-    "out vec4 FragColor;\n"
-    "in vec3 ourColor;\n"
-    "in vec2 TexCoord;\n"
-    "uniform sampler2D texture1;\n"
-    "void main()\n"
-    "{\n"
-    "   FragColor = texture(texture1, TexCoord);\n"
-    //"   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-    "}\n\0";
 
-int main()
-{
+int main() {
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -71,27 +46,27 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Lighting Cal", NULL, NULL);
-    if (window == NULL)
-    {
+    GLFWwindow *window =
+        glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Lighting Cal", NULL, NULL);
+    if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
 
     // build and compile our shader zprogram
     // ------------------------------------
-    //Shader lightingShader("lighting_maps.vs", "lighting_maps.fs");
+    // Shader lightingShader("lighting_maps.vs", "lighting_maps.fs");
 
     // build and compile our shader program
     // ------------------------------------
@@ -139,14 +114,15 @@ int main()
 
     float vertices[] = {
         // positions          // normals           // texture coords
-        1.0f,  1.0f,  0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, // top right
-        1.0f,  -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, // bottom right
-        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, // bottom left
-        -1.0f, 1.0f,  0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f  // top left
+        1.0f,  1.f,  0.0f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f, // top right
+        1.0f,  -1.f, 0.0f,    0.0f, 0.0f, 1.0f,    1.0f, 0.0f, // bottom right
+        -1.0f, -1.f, 0.0f,    0.0f, 0.0f, 1.0f,    0.0f, 0.0f, // bottom left
+        -1.0f, 1.f,  0.0f,    0.0f, 0.0f, 1.0f,    0.0f, 1.0f  // top left
     };
-    unsigned int indices[] = {  // note that we start from 0!
-        0, 1, 3,  // first Triangle
-        1, 2, 3   // second Triangle
+    unsigned int indices[] = {
+        // note that we start from 0!
+        0, 1, 3, // first triangle
+        1, 2, 3  // second triangle
     };
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -158,22 +134,25 @@ int main()
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+                 GL_STATIC_DRAW);
 
     // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
+                          (void *)0);
     glEnableVertexAttribArray(0);
     // normal attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
+                          (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
     // texture coord attribute
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
+                          (void *)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    
     // load and create a texture
     // -------------------------
     unsigned int texture;
@@ -192,9 +171,8 @@ int main()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // load image, create texture and generate mipmaps
     int width, height, nrChannels;
-    stbi_set_flip_vertically_on_load(true); 
-    unsigned char *data = stbi_load("D:\\git-repository\\Calendar_Project\\LightingCalendar\\ojwD8.jpg", &width,
-        &height, &nrChannels, 0);
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char *data = stbi_load("texture_reversed.jpg", &width, &height, &nrChannels, 0);
     if (data) {
         GLenum format;
         if (nrChannels == 1)
@@ -211,36 +189,38 @@ int main()
     }
     stbi_image_free(data);
 
-
     // shader configuration
     // --------------------
     glUseProgram(shaderProgram);
     glUniform1i(glGetUniformLocation(shaderProgram, "texture1"), 0);
-
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // render loop
     // -----------
-    while (!glfwWindowShouldClose(window))
-    {
+    while (!glfwWindowShouldClose(window)) {
         // input
         // -----
         processInput(window);
 
         // render
         // ------
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         // bind Texture
         glBindTexture(GL_TEXTURE_2D, texture);
+        glUniform3fv(glGetUniformLocation(shaderProgram, "viewPos"), 1, &viewPos[0]);
 
         // draw our first triangle
-        glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
-        //glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(VAO); // seeing as we only have a single VAO there's
+                                // no need to bind it every time, but we'll do
+                                // so to keep things a bit more organized
+        // glDrawArrays(GL_TRIANGLES, 0, 6);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        // glBindVertexArray(0); // no need to unbind it every time 
+        // glBindVertexArray(0); // no need to unbind it every time
 
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+        // glfw: swap buffers and poll IO events (keys pressed/released, mouse
+        // moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -258,20 +238,21 @@ int main()
     return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
+// process all input: query GLFW whether relevant keys are pressed/released this
+// frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window)
-{
+void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
+// glfw: whenever the window size changed (by OS or user resize) this callback
+// function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    // make sure the viewport matches the new window dimensions; note that width and 
-    // height will be significantly larger than specified on retina displays.
+void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
+    // make sure the viewport matches the new window dimensions; note that width
+    // and height will be significantly larger than specified on retina
+    // displays.
     glViewport(0, 0, width, height);
 }
 
@@ -288,10 +269,15 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     }
 
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+    float yoffset =
+        lastY - ypos; // reversed since y-coordinates go from bottom to top
 
     lastX = xpos;
     lastY = ypos;
 
-    //camera.ProcessMouseMovement(xoffset, yoffset);
+    viewPos.x = xpos * 2 / SCR_WIDTH - 1;
+    viewPos.y = -(ypos * 2 / SCR_HEIGHT - 1);
+
+    std::cout << viewPos.x << " " << viewPos.y << std::endl;
+    // camera.ProcessMouseMovement(xoffset, yoffset);
 }
